@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mestre RPG - IA</title>
+    <link rel="stylesheet" href="style.css">
+    <!-- Biblioteca PeerJS para comunicação Multiplayer (WebRTC) -->
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+</head>
+<body>
+      <div id="api-setup">
+    <label for="api-key-input">Sua Gemini API Key:</label>
+    <input type="password" id="api-key-input" placeholder="Cole sua chave aqui">
+    <button onclick="salvarChaveAPI()">Salvar Chave</button>
+      </div>
+    <div id="intro-screen" class="intro-overlay">
+        <div class="board-container" id="rpg-board">
+            <h2>Crie seu Personagem</h2>
+            
+            <div class="setup-grid">
+                <div class="setup-section">
+                    <div class="ficha-grupo">
+                        <label for="char-name">Nome do Herói/Heroína:</label>
+                        <input type="text" id="char-name" placeholder="Ex: Eldrin do Vale">
+                    </div>
+
+                    <div class="ficha-grupo">
+                        <label for="char-class">Selecione sua Classe:</label>
+                        <select id="char-class">
+                            <option value="Guerreiro">Guerreiro (Foco em Combate)</option>
+                            <option value="Mago">Mago (Foco em Arcana)</option>
+                            <option value="Ladino">Ladino (Foco em Destreza)</option>
+                            <option value="Clérigo">Clérigo (Foco em Fé/Suporte)</option>
+                            <option value="Bárbaro">Bárbaro (Foco em Força Bruta)</option>
+                            <option value="Bardo">Bardo (Foco em Carisma/Arte)</option>
+                            <option value="Paladino">Paladino (Foco em Justiça)</option>
+                            <option value="Arqueiro">Arqueiro (Foco em Longo Alcance)</option>
+                            <option value="Druida">Druida (Foco em Natureza)</option>
+                            <option value="Necromante">Necromante (Foco em Trevas)</option>
+                            <option value="Monge">Monge (Foco em Equilíbrio)</option>
+                            <option value="Alquimista">Alquimista (Foco em Itens/Poções)</option>
+                            <option value="Feiticeiro">Feiticeiro (Foco em Magia Inata)</option>
+                            <option value="Invocador">Invocador (Foco em Criaturas)</option>
+                            <option value="Cavaleiro Rúnico">Cavaleiro Rúnico (Foco em Defesa/Runas)</option>
+                        </select>
+                    </div>
+
+                    <!-- Configuração do Modo de Jogo -->
+                    <div class="ficha-grupo" style="margin-top: 15px;">
+                        <label for="game-mode">Modo de Jogo:</label>
+                        <select id="game-mode" onchange="alternarModoJogo()">
+                            <option value="solo">Individual (Solo)</option>
+                            <option value="multiplayer">Multiplayer (Co-op)</option>
+                        </select>
+                    </div>
+
+                    <!-- Painel da Sala Multiplayer -->
+                    <div id="multiplayer-panel" class="hidden" style="margin-top: 15px; border-top: 1px dashed #8c6d3d; padding-top: 10px;">
+                        <h3 style="margin: 5px 0 10px 0; font-size: 16px;">Sala Multiplayer</h3>
+                        <button onclick="criarSala()" style="background: #2d6a4f; color: #fff; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-family: inherit; font-weight: bold;">Criar Sala (Host)</button>
+                        
+                        <div style="margin-top: 10px; display: flex; gap: 5px;">
+                            <input type="text" id="join-room-code" placeholder="Código da Sala" style="flex: 1; padding: 6px; background: #15110e; border: 1px solid #8c6d3d; color: #ffd700; border-radius: 4px;">
+                            <button onclick="entrarSala()" style="background: #8c6d3d; color: #fff; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-family: inherit; font-weight: bold;">Entrar</button>
+                        </div>
+                        <p id="room-status" style="color: #ffd700; font-size: 13px; margin-top: 8px; font-style: italic;"></p>
+                    </div>
+                </div>
+
+                <div class="setup-section">
+                    <h3>Atributos (<span id="points-left">10</span> Pontos Disponíveis)</h3>
+                    <div class="attr-creation">
+                        <div class="attr-row">
+                            <span>Força: <strong id="setup-forca">10</strong></span>
+                            <button onclick="distribuirPonto('forca', 1)">+</button>
+                            <button onclick="distribuirPonto('forca', -1)">-</button>
+                        </div>
+                        <div class="attr-row">
+                            <span>Destreza: <strong id="setup-destreza">10</strong></span>
+                            <button onclick="distribuirPonto('destreza', 1)">+</button>
+                            <button onclick="distribuirPonto('destreza', -1)">-</button>
+                        </div>
+                        <div class="attr-row">
+                            <span>Inteligência: <strong id="setup-inteligencia">10</strong></span>
+                            <button onclick="distribuirPonto('inteligencia', 1)">+</button>
+                            <button onclick="distribuirPonto('inteligencia', -1)">-</button>
+                        </div>
+                        <div class="attr-row">
+                            <span>Constituição: <strong id="setup-constituicao">10</strong></span>
+                            <button onclick="distribuirPonto('constituicao', 1)">+</button>
+                            <button onclick="distribuirPonto('constituicao', -1)">-</button>
+                        </div>
+                        <div class="attr-row">
+                            <span>Carisma: <strong id="setup-carisma">10</strong></span>
+                            <button onclick="distribuirPonto('carisma', 1)">+</button>
+                            <button onclick="distribuirPonto('carisma', -1)">-</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <button class="start-btn" onclick="iniciarJornada()">Iniciar Jornada</button>
+        </div>
+    </div>
+
+    <div class="game-container hidden" id="game-screen">
+        <header class="game-header">
+            <button class="nav-btn-restart" onclick="novaJornada()">🔄 Nova Jornada</button>
+            <h1 class="game-title">Mestre de RPG IA</h1>
+        </header>
+
+        <nav class="tabs-menu">
+            <button class="tab-btn active" onclick="openTab('aventura')">Aventura</button>
+            <button class="tab-btn" onclick="openTab('ficha')">Ficha do Personagem</button>
+        </nav>
+
+        <div class="main-layout">
+            <div class="left-pane">
+                <section id="aventura" class="tab-content active-content">
+                    
+                    <!-- Indicador de Turno -->
+                    <div id="turn-indicator" style="background: #1f1815; border: 1px solid #8c6d3d; padding: 8px; margin-bottom: 10px; border-radius: 4px; text-align: center; font-weight: bold; color: #ffd700;">
+                        Turno Atual: Aguardando início...
+                    </div>
+
+                    <div class="story-log" id="storyLog">
+                        <p><strong>Mestre:</strong> Sua jornada está prestes a começar...</p>
+                    </div>
+
+                    <div id="test-selector-container" class="hidden" style="background: #1f1815; border: 1px solid #8c6d3d; padding: 12px; margin-bottom: 12px; border-radius: 4px;">
+                        <p style="margin: 0 0 8px 0; color: #ffd700; font-size: 14px; font-weight: bold; font-family: inherit;">🎯 TESTE REQUERIDO PELO MESTRE:</p>
+                        <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                            <span style="font-size: 13px;">Selecione o Atributo:</span>
+                            <select id="active-test-attribute" style="width: auto; padding: 5px; background: #15110e; color: #ffd700; border: 1px solid #8c6d3d; border-radius: 4px; font-family: inherit; cursor: pointer;">
+                                <option value="forca">FORÇA</option>
+                                <option value="destreza">DESTREZA</option>
+                                <option value="inteligencia">INTELIGÊNCIA</option>
+                                <option value="constituicao">CONSTITUIÇÃO</option>
+                                <option value="carisma">CARISMA</option>
+                            </select>
+                            <span style="font-size: 13px;">Dado exigido:</span>
+                            <select id="active-test-die" style="width: auto; padding: 5px; background: #15110e; color: #ffd700; border: 1px solid #8c6d3d; border-radius: 4px; font-family: inherit; cursor: pointer;">
+                                <option value="6">d6</option>
+                                <option value="10">d10</option>
+                                <option value="20">d20</option>
+                            </select>
+                            <button onclick="confirmarEEnviarTeste()" style="background: #2d6a4f; color: white; border: none; padding: 6px 12px; cursor: pointer; border-radius: 4px; font-weight: bold; font-family: inherit; transition: background 0.2s;">
+                                Confirmar Escolha
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="input-area">
+                        <input type="text" id="playerInput" placeholder="Digite sua ação aqui...">
+                        <button onclick="enviarAcao()">Enviar</button>
+                    </div>
+                </section>
+
+                <section id="ficha" class="tab-content">
+                    <h2>Ficha de Personagem</h2>
+                    <div class="ficha-readonly">
+                        <p><strong>Nome:</strong> <span id="view-nome">-</span></p>
+                        <p><strong>Classe:</strong> <span id="view-classe">-</span></p>
+                        <p><strong>Nível:</strong> <span id="view-nivel">1</span> (<span id="level-points">0</span> pontos de atributo pendentes)</p>
+                        
+                        <!-- Progresso de XP -->
+                        <div style="margin: 15px 0;">
+                            <p style="margin: 0 0 5px 0;"><strong>XP:</strong> <span id="view-xp">0</span> / <span id="view-xp-max">100</span></p>
+                            <div style="width: 100%; background: #1f1815; height: 16px; border-radius: 8px; border: 1px solid #8c6d3d; overflow: hidden;">
+                                <div id="xp-bar" style="width: 0%; background: linear-gradient(90deg, #2d6a4f, #52b788); height: 100%; transition: width 0.4s ease;"></div>
+                            </div>
+                        </div>
+
+                        <h3>Atributos</h3>
+                        <div class="attr-readonly-list">
+                            <div class="attr-view-row">
+                                <span>Força: <strong id="game-forca">10</strong></span>
+                                <button class="lvl-up-btn hidden" onclick="subirAtributo('forca')">+</button>
+                            </div>
+                            <div class="attr-view-row">
+                                <span>Destreza: <strong id="game-destreza">10</strong></span>
+                                <button class="lvl-up-btn hidden" onclick="subirAtributo('destreza')">+</button>
+                            </div>
+                            <div class="attr-view-row">
+                                <span>Inteligência: <strong id="game-inteligencia">10</strong></span>
+                                <button class="lvl-up-btn hidden" onclick="subirAtributo('inteligencia')">+</button>
+                            </div>
+                            <div class="attr-view-row">
+                                <span>Constituição: <strong id="game-constituicao">10</strong></span>
+                                <button class="lvl-up-btn hidden" onclick="subirAtributo('constituicao')">+</button>
+                            </div>
+                            <div class="attr-view-row">
+                                <span>Carisma: <strong id="game-carisma">10</strong></span>
+                                <button class="lvl-up-btn hidden" onclick="subirAtributo('carisma')">+</button>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+            <aside class="right-pane">
+                <h3>Torre de Dados</h3>
+                <div class="dice-selection">
+                    
+                    <div class="dice-container">
+                        <div class="dice d6" id="die-6">6</div>
+                        <button class="roll-sub-btn" onclick="animarERolarIndividual(6)">Rolar d6</button>
+                    </div>
+
+                    <div class="dice-container">
+                        <div class="dice d10" id="die-10">10</div>
+                        <button class="roll-sub-btn" onclick="animarERolarIndividual(10)">Rolar d10</button>
+                    </div>
+
+                    <div class="dice-container">
+                        <div class="dice d20" id="die-20">20</div>
+                        <button class="roll-sub-btn" onclick="animarERolarIndividual(20)">Rolar d20</button>
+                    </div>
+
+                </div>
+                <div class="roll-history">
+                    <h4>Resultado Atual:</h4>
+                    <p id="current-roll">Aguardando rolagens...</p>
+                </div>
+            </aside>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

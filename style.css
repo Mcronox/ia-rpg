@@ -1,0 +1,392 @@
+/* --- CONFIGURAÇÃO GERAL E TEMA ESCURO --- */
+body {
+    background-color: #15110e;
+    color: #e6d5bc;
+    font-family: 'Georgia', serif;
+    margin: 0;
+    padding: 0;
+    overflow-x: hidden;
+    height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* --- TELA DE INTRODUÇÃO (Efeito de Tabuleiro/Livro na Mesa) --- */
+.intro-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: radial-gradient(circle, #241a15 30%, #0d0907 100%);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 100;
+    
+    /* Define o espaço 3D para os elementos filhos */
+    perspective: 1000px; 
+}
+
+.board-container {
+    background: #2c221e;
+    border: 3px solid #8c6d3d;
+    box-shadow: 0 25px 50px rgba(0,0,0,0.9);
+    border-radius: 8px;
+    padding: 30px;
+    max-width: 680px;
+    width: 90%;
+    text-align: center;
+    
+    /* Mantém o container estável no espaço 3D */
+    opacity: 0;
+    transform-style: preserve-3d;
+    backface-visibility: hidden;
+    
+    /* Animação corrigida de queda suave e abertura */
+    animation: board-slam-and-open 1.2s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+}
+
+@keyframes board-slam-and-open {
+    0% {
+        transform: translateY(-80vh) rotateX(-30deg) scale(0.7);
+        opacity: 0;
+    }
+    50% {
+        transform: translateY(0) rotateX(15deg) scale(1.02);
+        opacity: 1;
+    }
+    75% {
+        transform: translateY(0) rotateX(-5deg) scale(0.98);
+    }
+    100% {
+        transform: translateY(0) rotateX(0deg) scale(1);
+        opacity: 1;
+    }
+}
+
+/* --- TELA DE CRIAÇÃO (GRID E ATRIBUTOS) --- */
+.setup-grid {
+    display: flex;
+    gap: 20px;
+    text-align: left;
+    margin: 20px 0;
+}
+
+.setup-section {
+    flex: 1;
+    background: #1f1815;
+    padding: 15px;
+    border-radius: 6px;
+    border: 1px solid #4a3b32;
+}
+
+.attr-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin: 12px 0;
+}
+
+select, input[type="text"] {
+    width: 100%;
+    background: #15110e;
+    border: 1px solid #8c6d3d;
+    color: #ffd700;
+    padding: 10px;
+    box-sizing: border-box;
+    border-radius: 4px;
+    font-family: inherit;
+}
+
+/* Botão de começar jornada */
+.start-btn {
+    background: #8c6d3d;
+    color: #fff;
+    font-size: 18px;
+    border: 2px solid #ffd700;
+    padding: 12px 30px;
+    cursor: pointer;
+    border-radius: 4px;
+    font-weight: bold;
+    transition: 0.2s;
+    margin-top: 10px;
+}
+
+.start-btn:hover {
+    background: #b38f54;
+    box-shadow: 0 0 10px rgba(255, 215, 0, 0.4);
+}
+
+/* --- TELA PRINCIPAL DE JOGO --- */
+.game-container {
+    width: 95%;
+    max-width: 1100px;
+    background: #231a16;
+    border: 2px solid #8c6d3d;
+    border-radius: 8px;
+    box-shadow: 0 0 25px rgba(0,0,0,0.8);
+}
+
+.game-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #1a1310;
+    padding: 10px 20px;
+    border-bottom: 2px solid #8c6d3d;
+}
+
+.game-title {
+    margin: 0;
+    font-size: 24px;
+    color: #ffd700;
+}
+
+.nav-btn-restart {
+    background: #5c1a1a;
+    border: 1px solid #993333;
+    color: #fff;
+    padding: 8px 15px;
+    cursor: pointer;
+    border-radius: 4px;
+    font-weight: bold;
+    transition: 0.2s;
+}
+
+.nav-btn-restart:hover {
+    background: #802424;
+}
+
+/* Layout em duas colunas */
+.main-layout {
+    display: flex;
+    min-height: 500px;
+}
+
+.left-pane {
+    flex: 2;
+    border-right: 2px solid #8c6d3d;
+    padding: 20px;
+}
+
+.right-pane {
+    flex: 1;
+    background: #1c1512;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    border-top: 1px solid #3d2f28;
+}
+
+/* --- MENU DE ABAS --- */
+.tabs-menu {
+    display: flex;
+    background: #17110e;
+    border-bottom: 2px solid #8c6d3d;
+}
+
+.tab-btn {
+    flex: 1;
+    background: none;
+    border: none;
+    color: #a68a66;
+    padding: 12px;
+    cursor: pointer;
+    font-size: 16px;
+    font-weight: bold;
+    transition: 0.2s;
+}
+
+.tab-btn.active, .tab-btn:hover {
+    background: #231a16;
+    color: #ffd700;
+}
+
+.tab-content { display: none; }
+.tab-content.active-content { display: block; }
+
+/* --- ABA DA AVENTURA --- */
+.story-log {
+    height: 350px;
+    background: #17110e;
+    border: 1px solid #4a3b32;
+    padding: 15px;
+    overflow-y: auto;
+    margin-bottom: 15px;
+    border-radius: 4px;
+    line-height: 1.6;
+}
+
+.input-area {
+    display: flex;
+    gap: 10px;
+}
+
+.input-area input {
+    flex: 1;
+    background: #17110e;
+    border: 1px solid #8c6d3d;
+    color: #fff;
+    padding: 12px;
+    border-radius: 4px;
+}
+
+.input-area button {
+    background: #8c6d3d;
+    border: none;
+    color: white;
+    padding: 0 25px;
+    cursor: pointer;
+    border-radius: 4px;
+    font-weight: bold;
+    transition: 0.2s;
+}
+
+.input-area button:hover {
+    background: #b38f54;
+}
+
+/* --- ABA DA FICHA (Apenas Leitura) --- */
+.ficha-readonly {
+    line-height: 1.8;
+}
+
+.attr-view-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #17110e;
+    margin: 8px 0;
+    padding: 8px 15px;
+    border-radius: 4px;
+    border: 1px solid #3d2f28;
+}
+
+.lvl-up-btn {
+    background: #2d6a4f;
+    color: white;
+    border: none;
+    padding: 4px 10px;
+    cursor: pointer;
+    border-radius: 3px;
+    font-weight: bold;
+}
+
+.lvl-up-btn:hover {
+    background: #40916c;
+}
+
+/* --- TORRE DE DADOS E GEOMETRIAS --- */
+.dice-selection {
+    display: flex;
+    flex-direction: column;
+    gap: 25px;
+    align-items: center;
+    margin: 20px 0;
+    width: 100%;
+}
+
+.dice-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    perspective: 800px;
+}
+
+/* Base Comum dos Dados */
+.dice {
+    width: 60px;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    font-weight: bold;
+    color: #ffd700;
+    transition: transform 0.15s ease;
+    text-shadow: 1px 1px 2px #000;
+}
+
+/* Dado d6 (Cubo Tradicional) */
+.dice.d6 {
+    background: linear-gradient(135deg, #a62626, #591111);
+    border: 2px solid #ffd700;
+    border-radius: 8px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+}
+
+/* Dado d10 (Losango Lapidado) */
+.dice.d10 {
+    background: linear-gradient(135deg, #1d613c, #0a331c);
+    clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+    filter: drop-shadow(0px 4px 6px rgba(0,0,0,0.6));
+}
+
+/* Dado d20 (Icosaedro Sagrado) */
+.dice.d20 {
+    background: linear-gradient(135deg, #1b3d6c, #0b1a30);
+    clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+    filter: drop-shadow(0px 4px 6px rgba(0,0,0,0.6));
+}
+
+/* Botões Pequenos dos Dados */
+.roll-sub-btn {
+    background: #1f1815;
+    border: 1px solid #8c6d3d;
+    color: #ffd700;
+    padding: 4px 12px;
+    font-size: 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: 0.2s;
+    font-family: inherit;
+}
+
+.roll-sub-btn:hover {
+    background: #8c6d3d;
+    color: #fff;
+}
+
+.roll-history {
+    text-align: center;
+    margin-top: 15px;
+}
+
+/* --- ANIMAÇÕES DE GIRO ESPECÍFICAS --- */
+.dice.rolling-d6 {
+    animation: roll-d6 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+.dice.rolling-d10 {
+    animation: roll-d10 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+.dice.rolling-d20 {
+    animation: roll-d20 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes roll-d6 {
+    0% { transform: rotate(0deg) scale(1); }
+    30% { transform: rotate(180deg) scale(1.35); }
+    70% { transform: rotate(-360deg) scale(0.9); }
+    100% { transform: rotate(0deg) scale(1); }
+}
+
+@keyframes roll-d10 {
+    0% { transform: rotateX(0) rotateY(0) scale(1); }
+    50% { transform: rotateX(360deg) rotateY(180deg) scale(1.4); }
+    100% { transform: rotateX(0) rotateY(0) scale(1); }
+}
+
+@keyframes roll-d20 {
+    0% { transform: scale(1) rotate(0deg); }
+    25% { transform: scale(1.4) rotate(120deg); }
+    50% { transform: scale(1.2) rotate(-240deg); }
+    75% { transform: scale(1.4) rotate(480deg); }
+    100% { transform: scale(1) rotate(0deg); }
+}
+
+/* --- UTILITÁRIOS --- */
+.hidden { display: none !important; }
