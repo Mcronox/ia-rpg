@@ -390,3 +390,56 @@ select, input[type="text"] {
 
 /* --- UTILITÁRIOS --- */
 .hidden { display: none !important; }
+
+/* --- ADAPTAÇÃO PARA TELA DE CELULAR --- */
+@media screen and (max-width: 768px) {
+    /* Força o contêiner a se ajustar à largura real da tela do celular */
+    html, body {
+        overflow-x: hidden;
+        padding: 5px;
+        margin: 0;
+    }
+
+    /* Reduz o tamanho de fontes e botões gigantes */
+    body {
+        font-size: 13px;
+    }
+
+    .container, #game-screen, #intro-screen {
+        width: 100% !important;
+        max-width: 100% !important;
+        padding: 8px !important;
+        box-sizing: border-box;
+    }
+
+    /* Diminui a caixa do histórico para caber o teclado sem quebrar a tela */
+    #storyLog {
+        height: 200px !important;
+        max-height: 35vh !important;
+        font-size: 13px;
+        padding: 8px;
+    }
+
+    /* Ajusta os botões e inputs para não vazarem da tela */
+    input[type="text"], select, button {
+        width: 100% !important;
+        max-width: 100% !important;
+        font-size: 14px !important;
+        padding: 10px !important;
+        margin-bottom: 6px !important;
+        box-sizing: border-box;
+    }
+
+    /* Deixa os painéis de ficha e dados em coluna única */
+    .stats-grid, .dice-panel, .tab-buttons {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+    }
+
+    /* Evita que botões desabilitados pareçam clicáveis */
+    button:disabled, input:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+    }
+}
