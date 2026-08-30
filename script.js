@@ -1,12 +1,12 @@
 // --- CONFIGURAÇÃO DA CHAVE DE API ---
 let GEMINI_API_KEY = localStorage.getItem("GEMINI_API_KEY") || "";
 
-// Preenche o input caso a chave já esteja salva no navegador
 document.addEventListener("DOMContentLoaded", () => {
     if (GEMINI_API_KEY) {
         const inputElem = document.getElementById('api-key-input');
         if (inputElem) inputElem.value = GEMINI_API_KEY;
     }
+    atualizarEstadoCampos();
 });
 
 function salvarChaveAPI() {
@@ -21,13 +21,12 @@ function salvarChaveAPI() {
 }
 
 // --- ESTADO DO JOGO E MULTIPLAYER ---
-let modoJogo = "solo"; // "solo" ou "multiplayer"
+let modoJogo = "solo";
 let peer = null;
 let conexao = null;
 let eHost = false;
 let meuTurno = true;
 
-// Estado Inicial do Personagem
 let personagem = {
     nome: "",
     classe: "",
@@ -39,78 +38,30 @@ let personagem = {
     xpNecessario: 100
 };
 
-// Guarda as informações do teste que o jogador está prestes a fazer
 let testeAtivo = {
     requerido: false,
     atributo: "forca",
     ladosDado: 6
 };
 
-// Histórico de conversa para a IA lembrar do contexto
 let historicoChat = [];
 
-// Tabela de Efeitos Aleatórios por Classe (Fatores do Destino)
 const destinoClasses = {
-    "Guerreiro": [
-        "Você começa com uma Espada de Aço Valiriano herdada de seu pai, garantindo +2 em testes de Força física.",
-        "Sua armadura antiga está danificada, reduzindo sua iniciativa no primeiro combate, mas você possui um escudo resistente."
-    ],
-    "Mago": [
-        "Seu grimório possui uma página misteriosa arrancada. Você sente que recuperá-la revelará um poder imenso.",
-        "Um experimento antigo deu errado: você brilha levemente no escuro, o que dificultará se esconder, mas assusta criaturas das sombras."
-    ],
-    "Ladino": [
-        "Você possui uma chave mestra dourada que abre quase qualquer fechadura comum, mas ela quebrará se você falhar num teste.",
-        "Há um preço pela sua cabeça na taverna local. Alguns mercenários podem te reconhecer durante a jornada."
-    ],
-    "Clérigo": [
-        "Sua divindade lhe concedeu uma premonição: você sabe que encontrará um aliado traidor em breve.",
-        "Você carrega um frasco de Água Benta abençoada que pode purificar uma fonte de água ou causar dano massivo a um morto-vivo."
-    ],
-    "Bárbaro": [
-        "Seu amuleto de dente de urso lhe dá resistência a venenos, mas sua fúria torna difícil dialogar diplomaticamente.",
-        "Você foi banido de sua tribo por um crime que não cometeu. Membros do seu clã estão caçando você."
-    ],
-    "Bardo": [
-        "Seu alaúde é mágico e consegue acalmar feras selvagens se você passar num teste de Carisma.",
-        "Você conhece uma fofoca comprometedora sobre o rei local, o que pode te dar passe livre ou uma sentença de morte."
-    ],
-    "Paladino": [
-        "Seu juramento sagrado brilha em seu peito. Mentir causa dor física em você, mas sua presença inspira camponeses.",
-        "Você possui uma montaria leal (um cavalo de guerra), mas ele está exausto e precisará de descanso logo no início."
-    ],
-    "Arqueiro": [
-        "Sua aljava mágica nunca fica totalmente vazia, mas suas flechas causam menos dano a curta distância.",
-        "Você tem uma visão de águia incomparável, conseguindo enxergar perigos a milhas de distância antes de qualquer um."
-    ],
-    "Druida": [
-        "Um pequeno esquilo falante acompanha você. Ele sabe segredos da floresta, mas é extremamente sarcástico.",
-        "A natureza chora onde você pisa. Plantas murchas revivem temporariamente, revelando caminhos ocultos."
-    ],
-    "Necromante": [
-        "Você carrega o crânio falante de seu antigo mentor. Ele sabe muito sobre magia, mas vive dando conselhos ruins.",
-        "Animais comuns sentem pavor de você e fogem. Isso torna montarias inúteis, mas lobos hesitam antes de atacar."
-    ],
-    "Monge": [
-        "Seu corpo é uma arma. Você não precisa de espadas, mas jurou nunca derramar sangue desnecessariamente.",
-        "Você consegue prender a respiração por até 10 minutos, o que será extremamente útil se encontrar caminhos alagados."
-    ],
-    "Alquimista": [
-        "Você começa com 3 poções instáveis: uma cura, uma explode e a terceira tem um efeito totalmente desconhecido.",
-        "Suas mãos estão manchadas de reagentes químicos, permitindo que você identifique qualquer substância pelo cheiro."
-    ],
-    "Feiticeiro": [
-        "Sua magia é instável. Sempre que tirar 1 no d20, um efeito caótico aleatório acontece ao seu redor.",
-        "Você descende de uma linhagem de dragões. Criaturas reptilianas entendem seus comandos básicos."
-    ],
-    "Invocador": [
-        "Você tem um pacto com uma pequena criatura do plano elemental. Ela pode atravessar paredes finas.",
-        "Seu portal de invocação está instável. Às vezes, ao tentar invocar algo, apenas um pato inofensivo aparece."
-    ],
-    "Cavaleiro Rúnico": [
-        "Sua armadura tem uma runa de proteção ativa que absorve o primeiro impacto de cada batalha.",
-        "Você consegue ler escritas antigas gravadas em pedras e ruínas abandonadas sem precisar de testes."
-    ]
+    "Guerreiro": ["Você começa com uma Espada de Aço Valiriano herdada de seu pai, garantindo +2 em testes de Força física.", "Sua armadura antiga está danificada, reduzindo sua iniciativa no primeiro combate, mas você possui um escudo resistente."],
+    "Mago": ["Seu grimório possui uma página misteriosa arrancada. Você sente que recuperá-la revelará um poder imenso.", "Um experimento antigo deu errado: você brilha levemente no escuro, o que dificultará se esconder, mas assusta criaturas das sombras."],
+    "Ladino": ["Você possui uma chave mestra dourada que abre quase qualquer fechadura comum, mas ela quebrará se você falhar num teste.", "Há um preço pela sua cabeça na taverna local. Alguns mercenários podem te reconhecer durante a jornada."],
+    "Clérigo": ["Sua divindade lhe concedeu uma premonição: você sabe que encontrará um aliado traidor em breve.", "Você carrega um frasco de Água Benta abençoada que pode purificar uma fonte de água ou causar dano massivo a um morto-vivo."],
+    "Bárbaro": ["Seu amuleto de dente de urso lhe dá resistência a venenos, mas sua fúria torna difícil dialogar diplomaticamente.", "Você foi banido de sua tribo por um crime que não cometeu. Membros do seu clã estão caçando você."],
+    "Bardo": ["Seu alaúde é mágico e consegue acalmar feras selvagens se você passar num teste de Carisma.", "Você conhece uma fofoca comprometedora sobre o rei local, o que pode te dar passe livre ou uma sentença de morte."],
+    "Paladino": ["Seu juramento sagrado brilha em seu peito. Mentir causa dor física em você, mas sua presença inspira camponeses.", "Você possui uma montaria leal (um cavalo de guerra), mas ele está exausto e precisará de descanso logo no início."],
+    "Arqueiro": ["Sua aljava mágica nunca fica totalmente vazia, mas suas flechas causam menos dano a curta distância.", "Você tem uma visão de águia incomparável, conseguindo enxergar perigos a milhas de distância antes de qualquer um."],
+    "Druida": ["Um pequeno esquilo falante acompanha você. Ele sabe segredos da floresta, mas é extremamente sarcástico.", "A natureza chora onde você pisa. Plantas murchas revivem temporariamente, revelando caminhos ocultos."],
+    "Necromante": ["Você carrega o crânio falante de seu antigo mentor. Ele sabe muito sobre magia, mas vive dando conselhos ruins.", "Animais comuns sentem pavor de você e fogem. Isso torna montarias inúteis, mas lobos hesitam antes de atacar."],
+    "Monge": ["Seu corpo é uma arma. Você não precisa de espadas, mas jurou nunca derramar sangue desnecessariamente.", "Você consegue prender a respiração por até 10 minutos, o que será extremamente útil se encontrar caminhos alagados."],
+    "Alquimista": ["Você começa com 3 poções instáveis: uma cura, uma explode e a terceira tem um efeito totalmente desconhecido.", "Suas mãos estão manchadas de reagentes químicos, permitindo que você identifique qualquer substância pelo cheiro."],
+    "Feiticeiro": ["Sua magia é instável. Sempre que tirar 1 no d20, um efeito caótico aleatório acontece ao seu redor.", "Você descende de uma linhagem de dragões. Criaturas reptilianas entendem seus comandos básicos."],
+    "Invocador": ["Você tem um pacto com uma pequena criatura do plano elemental. Ela pode atravessar paredes finas.", "Seu portal de invocação está instável. Às vezes, ao tentar invocar algo, apenas um pato inofensivo aparece."],
+    "Cavaleiro Rúnico": ["Sua armadura tem uma runa de proteção ativa que absorve o primeiro impacto de cada batalha.", "Você consegue ler escritas antigas gravadas em pedras e ruínas abandonadas sem precisar de testes."]
 };
 
 // --- REDE E MULTIPLAYER (PEERJS) ---
@@ -122,6 +73,7 @@ function alternarModoJogo() {
     } else {
         mpPanel.classList.add('hidden');
     }
+    atualizarIndicadorTurno();
 }
 
 function criarSala() {
@@ -132,12 +84,18 @@ function criarSala() {
         eHost = true;
         meuTurno = true;
         document.getElementById('room-status').innerText = `Sala Criada! Código: ${id} (Aguardando Jogador 2...)`;
+        atualizarIndicadorTurno();
     });
 
     peer.on('connection', (conn) => {
         conexao = conn;
         configurarEventosConexao();
         document.getElementById('room-status').innerText = "Jogador 2 Conectado! Podem iniciar a jornada.";
+        
+        // Envia a Chave API salva no Host para o Jogador 2
+        if (GEMINI_API_KEY) {
+            enviarDadosRede('SYNC_API_KEY', GEMINI_API_KEY);
+        }
     });
 
     peer.on('error', (err) => {
@@ -157,9 +115,10 @@ function entrarSala() {
     peer.on('open', () => {
         conexao = peer.connect(salaId);
         eHost = false;
-        meuTurno = false; // O segundo a entrar aguarda a vez do Host
+        meuTurno = false; // O convidado sempre aguarda a vez do Host
         configurarEventosConexao();
         document.getElementById('room-status').innerText = "Conectado ao Host com sucesso!";
+        atualizarIndicadorTurno();
     });
 
     peer.on('error', (err) => {
@@ -181,6 +140,9 @@ function enviarDadosRede(tipo, payload) {
 
 function tratarDadosRecebidos(dados) {
     switch (dados.tipo) {
+        case 'SYNC_API_KEY':
+            GEMINI_API_KEY = dados.payload; // Recebe a API Key do Host
+            break;
         case 'MENSAGEM_JOGADOR':
             adicionarMensagemJogador(dados.payload.nome, dados.payload.texto);
             meuTurno = true;
@@ -197,6 +159,42 @@ function tratarDadosRecebidos(dados) {
             meuTurno = true;
             atualizarIndicadorTurno();
             break;
+    }
+}
+
+// --- GERENCIAMENTO DE TURNOS E BLOQUEIO DE INTERFACE ---
+function atualizarIndicadorTurno() {
+    const turnElem = document.getElementById('turn-indicator');
+    if (modoJogo === 'solo') {
+        turnElem.innerText = "Modo Solo - Seu Turno Livre";
+        turnElem.style.color = "#ffd700";
+        meuTurno = true;
+    } else {
+        if (meuTurno) {
+            turnElem.innerText = "👉 SEU TURNO DE AGIR!";
+            turnElem.style.color = "#2d6a4f";
+        } else {
+            turnElem.innerText = "⏳ TURNO DO COMPANHEIRO... (Aguarde)";
+            turnElem.style.color = "#e63946";
+        }
+    }
+    atualizarEstadoCampos();
+}
+
+function atualizarEstadoCampos() {
+    const inputElem = document.getElementById('playerInput');
+    const sendBtn = document.getElementById('send-action-btn');
+
+    if (inputElem && sendBtn) {
+        if (modoJogo === 'multiplayer' && !meuTurno) {
+            inputElem.disabled = true;
+            sendBtn.disabled = true;
+            inputElem.placeholder = "Aguarde o seu turno para escrever...";
+        } else {
+            inputElem.disabled = false;
+            sendBtn.disabled = false;
+            inputElem.placeholder = "Digite sua ação aqui...";
+        }
     }
 }
 
@@ -276,27 +274,18 @@ REGRAS CRUCIAIS DE JOGO E SOBREVIVÊNCIA:
 `;
 
     historicoChat = [
-        { 
-            role: "user", 
-            parts: [{ text: promptSistema }] 
-        },
-        { 
-            role: "model", 
-            parts: [{ text: "Entendido. Serei um Mestre implacável e justo. Que os dados decidam se você sobreviverá." }] 
-        }
+        { role: "user", parts: [{ text: promptSistema }] },
+        { role: "model", parts: [{ text: "Entendido. Serei um Mestre implacável e justo. Que os dados decidam se você sobreviverá." }] }
     ];
 }
 
 async function enviarParaIA(mensagemJogador) {
     if (!GEMINI_API_KEY || GEMINI_API_KEY.trim() === "") {
-        adicionarMensagemMestre("⚠️ [ERRO: Salve sua chave de API do Gemini no painel antes de enviar mensagens ao Mestre!]");
+        adicionarMensagemMestre("⚠️ [ERRO: Aguarde o Host fornecer a chave da API ou configure a sua chave no painel inicial!]");
         return;
     }
 
-    historicoChat.push({ 
-        role: "user", 
-        parts: [{ text: mensagemJogador }] 
-    });
+    historicoChat.push({ role: "user", parts: [{ text: mensagemJogador }] });
 
     if (modoJogo === "multiplayer") {
         enviarDadosRede('HISTORICO_IA', historicoChat);
@@ -318,7 +307,6 @@ async function enviarParaIA(mensagemJogador) {
         });
 
         const data = await response.json();
-        
         const loadingElement = document.getElementById(loadingId);
         if (loadingElement) loadingElement.remove();
 
@@ -332,11 +320,7 @@ async function enviarParaIA(mensagemJogador) {
         if (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts[0].text) {
             const respostaMestre = data.candidates[0].content.parts[0].text;
             
-            historicoChat.push({ 
-                role: "model", 
-                parts: [{ text: respostaMestre }] 
-            });
-            
+            historicoChat.push({ role: "model", parts: [{ text: respostaMestre }] });
             adicionarMensagemMestre(respostaMestre);
 
             if (modoJogo === "multiplayer") {
@@ -380,8 +364,8 @@ function ganharXP(quantidade) {
     while (personagem.xp >= personagem.xpNecessario) {
         personagem.xp -= personagem.xpNecessario;
         personagem.nivel++;
-        personagem.pontosLvlUp += 3; // +3 Pontos ao subir de nível
-        personagem.xpNecessario = Math.floor(personagem.xpNecessario * 1.5); // Aumenta exigência de XP para o próximo nível
+        personagem.pontosLvlUp += 3;
+        personagem.xpNecessario = Math.floor(personagem.xpNecessario * 1.5);
 
         const storyLog = document.getElementById('storyLog');
         storyLog.innerHTML += `<p class="system-msg" style="color: #ffd700; font-weight: bold;">🎉 NÍVEL AUMENTADO! Você subiu para o Nível ${personagem.nivel} e ganhou 3 pontos para distribuir!</p>`;
@@ -401,29 +385,11 @@ function subirAtributo(attr) {
     }
 }
 
-// --- GERENCIAMENTO DE TURNOS ---
-function atualizarIndicadorTurno() {
-    const turnElem = document.getElementById('turn-indicator');
-    if (modoJogo === 'solo') {
-        turnElem.innerText = "Modo Solo - Seu Turno Livre";
-        turnElem.style.color = "#ffd700";
-    } else {
-        if (meuTurno) {
-            turnElem.innerText = "👉 SEU TURNO DE AGIR!";
-            turnElem.style.color = "#2d6a4f";
-        } else {
-            turnElem.innerText = "⏳ TURNO DO COMPANHEIRO... (Aguarde)";
-            turnElem.style.color = "#e63946";
-        }
-    }
-}
-
 // --- MECÂNICA DE TESTES INTEGRADA AO CHAT ---
 function analisarEAtivarPainelDeTeste(texto) {
     const textoMinusculo = texto.toLowerCase();
     
     if (textoMinusculo.includes('[teste:') || textoMinusculo.includes('role um d') || textoMinusculo.includes('teste de')) {
-        
         let dadoDetectado = 20;
         if (textoMinusculo.includes('d6')) dadoDetectado = 6;
         else if (textoMinusculo.includes('d10')) dadoDetectado = 10;
@@ -436,7 +402,6 @@ function analisarEAtivarPainelDeTeste(texto) {
 
         document.getElementById('active-test-attribute').value = attrDetectado;
         document.getElementById('active-test-die').value = dadoDetectado;
-
         document.getElementById('test-selector-container').classList.remove('hidden');
         
         testeAtivo.requerido = true;
@@ -455,12 +420,17 @@ function confirmarEEnviarTeste() {
     document.getElementById('test-selector-container').classList.add('hidden');
 
     const storyLog = document.getElementById('storyLog');
-    storyLog.innerHTML += `<p class="system-msg" style="color: #ffd700; font-style: italic;">👉 <strong>Você preparou seu teste:</strong> Rolagem de d${dadoSelecionado} somada com o atributo ${atributoSelecionado.toUpperCase()} (Bônus de +${personagem.atributos[atributoSelecionado]}). Jogue o dado correspondente na Torre de Dados à direita!</p>`;
+    storyLog.innerHTML += `<p class="system-msg" style="color: #ffd700; font-style: italic;">👉 <strong>Você preparou seu teste:</strong> Rolagem de d${dadoSelecionado} somada com ${atributoSelecionado.toUpperCase()} (Bônus de +${personagem.atributos[atributoSelecionado]}). Jogue o dado correspondente!</p>`;
     storyLog.scrollTop = storyLog.scrollHeight;
 }
 
-// --- ROLAGEM DE DADOS INDIVIDUAIS COM ANIMAÇÃO ---
+// --- ROLAGEM DE DADOS INDIVIDUAIS ---
 function animarERolarIndividual(lados) {
+    if (modoJogo === 'multiplayer' && !meuTurno) {
+        alert("Aguarde o seu turno para rolar dados!");
+        return;
+    }
+
     const diceElement = document.getElementById(`die-${lados}`);
     const rollClass = `rolling-d${lados}`;
     
@@ -472,7 +442,6 @@ function animarERolarIndividual(lados) {
     setTimeout(() => {
         diceElement.classList.remove(rollClass);
         const resultadoDado = Math.floor(Math.random() * lados) + 1;
-        
         diceElement.innerText = resultadoDado;
 
         if (testeAtivo.requerido && testeAtivo.ladosDado === lados) {
@@ -481,12 +450,18 @@ function animarERolarIndividual(lados) {
 
             document.getElementById('current-roll').innerText = `Tirou ${resultadoDado} + ${bonusAtributo} (${testeAtivo.atributo.toUpperCase()}) = ${totalGeral}!`;
 
-            const mensagemTeste = `[SISTEMA: O jogador ${personagem.nome} executou o teste exigido. Rolagem do dado d${lados}: ${resultadoDado}. Seu bônus de ${testeAtivo.atributo.toUpperCase()} é +${bonusAtributo}. SOMA TOTAL DO TESTE = ${totalGeral}. Narre as consequências deste resultado!]`;
+            const mensagemTeste = `[SISTEMA: O jogador ${personagem.nome} executou o teste exigido. Rolagem do d${lados}: ${resultadoDado}. Bônus de ${testeAtivo.atributo.toUpperCase()}: +${bonusAtributo}. SOMA TOTAL = ${totalGeral}. Narre as consequências!]`;
             
             testeAtivo.requerido = false;
-            
-            // Sucesso no teste concede XP
             ganharXP(25);
+
+            if (modoJogo === 'multiplayer') {
+                enviarDadosRede('MENSAGEM_JOGADOR', { nome: personagem.nome, texto: `Realizou um teste (Total: ${totalGeral})` });
+                enviarDadosRede('PASSAR_TURNO', {});
+                meuTurno = false;
+                atualizarIndicadorTurno();
+            }
+
             enviarParaIA(mensagemTeste);
         } else {
             document.getElementById('current-roll').innerText = `Tirou ${resultadoDado} no d${lados}!`;
@@ -496,7 +471,7 @@ function animarERolarIndividual(lados) {
 }
 
 function enviarResultadoDadoParaMestre(resultado, lados) {
-    const msg = `[SISTEMA: O jogador ${personagem.nome} realizou uma rolagem casual de d${lados} na mesa e obteve o resultado ${resultado}]`;
+    const msg = `[SISTEMA: O jogador ${personagem.nome} realizou uma rolagem casual de d${lados} na mesa e obteve ${resultado}]`;
     enviarParaIA(msg);
 }
 
@@ -517,7 +492,6 @@ function atualizarFichaInterface() {
     document.getElementById('view-nivel').innerText = parseInt(personagem.nivel);
     document.getElementById('level-points').innerText = parseInt(personagem.pontosLvlUp);
 
-    // XP visual
     document.getElementById('view-xp').innerText = personagem.xp;
     document.getElementById('view-xp-max').innerText = personagem.xpNecessario;
     const porcentagem = Math.min((personagem.xp / personagem.xpNecessario) * 100, 100);
@@ -561,7 +535,6 @@ function novaJornada() {
     }
 }
 
-// Enviar ação escrita comum
 function enviarAcao() {
     if (modoJogo === 'multiplayer' && !meuTurno) {
         alert("Aguarde o seu turno para realizar uma ação!");
@@ -582,10 +555,7 @@ function enviarAcao() {
         }
 
         input.value = "";
-        
-        // Ação comum concede XP básico
         ganharXP(10);
-
         enviarParaIA(`${personagem.nome}: ${valor}`);
     }
 }
