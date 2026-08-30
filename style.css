@@ -6,7 +6,7 @@ body {
     margin: 0;
     padding: 0;
     overflow-x: hidden;
-    height: 100vh;
+    min-height: 100vh;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -17,15 +17,13 @@ body {
     position: fixed;
     top: 0;
     left: 0;
-    width: 100vw;
+    width: 100%;
     height: 100vh;
     background: radial-gradient(circle, #241a15 30%, #0d0907 100%);
     display: flex;
     justify-content: center;
     align-items: center;
     z-index: 100;
-    
-    /* Define o espaço 3D para os elementos filhos */
     perspective: 1000px; 
 }
 
@@ -38,13 +36,9 @@ body {
     max-width: 680px;
     width: 90%;
     text-align: center;
-    
-    /* Mantém o container estável no espaço 3D */
     opacity: 0;
     transform-style: preserve-3d;
     backface-visibility: hidden;
-    
-    /* Animação corrigida de queda suave e abertura */
     animation: board-slam-and-open 1.2s cubic-bezier(0.25, 1, 0.5, 1) forwards;
 }
 
@@ -127,6 +121,7 @@ select, input[type="text"] {
     border: 2px solid #8c6d3d;
     border-radius: 8px;
     box-shadow: 0 0 25px rgba(0,0,0,0.8);
+    margin: 10px auto;
 }
 
 .game-header {
@@ -391,53 +386,77 @@ select, input[type="text"] {
 /* --- UTILITÁRIOS --- */
 .hidden { display: none !important; }
 
-/* --- ADAPTAÇÃO PARA TELA DE CELULAR --- */
+/* --- ADAPTAÇÃO PARA TELA DE CELULAR (CORRIGIDO) --- */
 @media screen and (max-width: 768px) {
-    /* Força o contêiner a se ajustar à largura real da tela do celular */
-    html, body {
-        overflow-x: hidden;
-        padding: 5px;
-        margin: 0;
-    }
-
-    /* Reduz o tamanho de fontes e botões gigantes */
     body {
-        font-size: 13px;
+        height: auto;
+        min-height: 100vh;
+        align-items: flex-start;
+        padding: 5px;
     }
 
-    .container, #game-screen, #intro-screen {
-        width: 100% !important;
-        max-width: 100% !important;
-        padding: 8px !important;
-        box-sizing: border-box;
+    .board-container {
+        padding: 15px;
+        width: 95%;
     }
 
-    /* Diminui a caixa do histórico para caber o teclado sem quebrar a tela */
-    #storyLog {
-        height: 200px !important;
-        max-height: 35vh !important;
-        font-size: 13px;
-        padding: 8px;
-    }
-
-    /* Ajusta os botões e inputs para não vazarem da tela */
-    input[type="text"], select, button {
-        width: 100% !important;
-        max-width: 100% !important;
-        font-size: 14px !important;
-        padding: 10px !important;
-        margin-bottom: 6px !important;
-        box-sizing: border-box;
-    }
-
-    /* Deixa os painéis de ficha e dados em coluna única */
-    .stats-grid, .dice-panel, .tab-buttons {
-        display: flex;
+    .setup-grid {
         flex-direction: column;
-        gap: 5px;
+        gap: 10px;
     }
 
-    /* Evita que botões desabilitados pareçam clicáveis */
+    .game-container {
+        width: 100%;
+        margin: 0;
+        border-radius: 0;
+    }
+
+    /* Força o layout a virar coluna única para não estourar a lateral */
+    .main-layout {
+        flex-direction: column;
+        min-height: auto;
+    }
+
+    .left-pane {
+        border-right: none;
+        border-bottom: 2px solid #8c6d3d;
+        padding: 10px;
+    }
+
+    .right-pane {
+        padding: 15px;
+        border-top: none;
+    }
+
+    .story-log, #storyLog {
+        height: 220px !important;
+        max-height: 40vh !important;
+        font-size: 14px;
+        padding: 10px;
+    }
+
+    .input-area {
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .input-area button {
+        padding: 12px;
+        width: 100%;
+    }
+
+    .dice-selection {
+        flex-direction: row;
+        justify-content: space-around;
+        gap: 10px;
+    }
+
+    .dice {
+        width: 45px;
+        height: 45px;
+        font-size: 16px;
+    }
+
     button:disabled, input:disabled {
         opacity: 0.4;
         cursor: not-allowed;
