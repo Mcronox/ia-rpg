@@ -1,5 +1,13 @@
-// Busca a chave salva no navegador do usuário
+// --- CONFIGURAÇÃO DA CHAVE DE API ---
 let GEMINI_API_KEY = localStorage.getItem("GEMINI_API_KEY") || "";
+
+// Preenche o input caso a chave já esteja salva no navegador
+document.addEventListener("DOMContentLoaded", () => {
+    if (GEMINI_API_KEY) {
+        const inputElem = document.getElementById('api-key-input');
+        if (inputElem) inputElem.value = GEMINI_API_KEY;
+    }
+});
 
 function salvarChaveAPI() {
     const inputKey = document.getElementById('api-key-input').value.trim();
@@ -7,8 +15,11 @@ function salvarChaveAPI() {
         localStorage.setItem("GEMINI_API_KEY", inputKey);
         GEMINI_API_KEY = inputKey;
         alert("Chave API salva com sucesso!");
+    } else {
+        alert("Por favor, digite uma chave válida.");
     }
 }
+
 // --- ESTADO DO JOGO E MULTIPLAYER ---
 let modoJogo = "solo"; // "solo" ou "multiplayer"
 let peer = null;
@@ -277,8 +288,8 @@ REGRAS CRUCIAIS DE JOGO E SOBREVIVÊNCIA:
 }
 
 async function enviarParaIA(mensagemJogador) {
-    if (GEMINI_API_KEY === "SUA_CHAVE_AQUI_DENTRO" || GEMINI_API_KEY.trim() === "") {
-        adicionarMensagemMestre("⚠️ [ERRO: Você precisa colar sua chave de API do Gemini no início do script.js para o mestre funcionar!]");
+    if (!GEMINI_API_KEY || GEMINI_API_KEY.trim() === "") {
+        adicionarMensagemMestre("⚠️ [ERRO: Salve sua chave de API do Gemini no painel antes de enviar mensagens ao Mestre!]");
         return;
     }
 
@@ -474,7 +485,7 @@ function animarERolarIndividual(lados) {
             
             testeAtivo.requerido = false;
             
-            // Sucesso no teste concede mais XP
+            // Sucesso no teste concede XP
             ganharXP(25);
             enviarParaIA(mensagemTeste);
         } else {
@@ -494,7 +505,9 @@ function openTab(tabId) {
     document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active-content'));
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
     document.getElementById(tabId).classList.add('active-content');
-    event.currentTarget.classList.add('active');
+    if (event && event.currentTarget) {
+        event.currentTarget.classList.add('active');
+    }
 }
 
 function atualizarFichaInterface() {
