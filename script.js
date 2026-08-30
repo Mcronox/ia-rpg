@@ -25,10 +25,14 @@ let modoJogo = "solo";
 let peer = null;
 let conexao = null;
 let eHost = false;
-let jaAgioNesteTurno = false; // Controla se o jogador atual já enviou a ação na rodada
+let jaAgioNesteTurno = false;
 
-// Guarda as ações da rodada atual no Host antes de mandar para a IA
+// Controle de turnos e mecânicas em grupo
 let acoesDoTurno = []; 
+let votosDoTurno = {}; // { nomeJogador: opcaoEscolhida }
+let rolagemRealizadaNoTeste = false; // Garante que APENAS 1 pessoa role o dado em testes coletivos
+let jogadorBloqueado = false; // Controle de bloqueio temporário (modo observador)
+let jogadorAlvoExclusivo = null; // Se definido, apenas este jogador pode agir
 
 let personagem = {
     nome: "",
@@ -44,7 +48,8 @@ let personagem = {
 let testeAtivo = {
     requerido: false,
     atributo: "forca",
-    ladosDado: 6
+    ladosDado: 6,
+    alvo: null // null para grupo todo, ou nome do personagem específico
 };
 
 let historicoChat = [];
@@ -145,43 +150,66 @@ function tratarDadosRecebidos(dados) {
         case 'SYNC_API_KEY':
             GEMINI_API_KEY = dados.payload;
             break;
+
         case 'REGISTRAR_ACAO_JOGADOR':
             adicionarMensagemJogador(dados.payload.nome, dados.payload.texto);
-            
             if (eHost) {
-                // Host registra a ação do Jogador 2
+                acoesDoTurno.push(`${dados.payload.nome}: ${dados.payload.texto}`);
+                votosDoTurno[dados.payload.nome] = dados.payload.texto;
+                verificarEProcessarTurnoColetivo();
+            }
+            break;
+
+        case 'TESTE_REALIZADO':
+            // Notifica todos da sala que a única rolagem permitida daquele teste já foi feita
+            rolagemRealizadaNoTeste = true;
+            adicionarMensagemJogador(dados.payload.nome, dados.payload.texto);
+            if (eHost) {
                 acoesDoTurno.push(`${dados.payload.nome}: ${dados.payload.texto}`);
                 verificarEProcessarTurnoColetivo();
             }
             break;
+
         case 'MENSAGEM_MESTRE':
             adicionarMensagemMestre(dados.payload);
             analisarEAtivarPainelDeTeste(dados.payload);
             break;
+
         case 'NOVA_RODADA':
-            // Libera o turno para todos os jogadores responderem novamente
             jaAgioNesteTurno = false;
+            rolagemRealizadaNoTeste = false;
+            jogadorAlvoExclusivo = dados.payload.alvoExclusivo || null;
             atualizarIndicadorTurno();
             break;
+
         case 'HISTORICO_IA':
             historicoChat = dados.payload;
             break;
     }
 }
 
-// --- GERENCIAMENTO DE TURNOS COLETIVOS ---
+// --- GERENCIAMENTO DE TURNOS E EXCLUSIVIDADE ---
 function atualizarIndicadorTurno() {
     const turnElem = document.getElementById('turn-indicator');
-    if (modoJogo === 'solo') {
-        turnElem.innerText = "Modo Solo - Seu Turno Livre";
-        turnElem.style.color = "#ffd700";
+    
+    // Verifica se há um alvo exclusivo e se o jogador atual NÃO é essa pessoa
+    if (jogadorAlvoExclusivo && jogadorAlvoExclusivo.toLowerCase() !== personagem.nome.toLowerCase()) {
+        jogadorBloqueado = true;
+        turnElem.innerText = `👁️ MODO OBSERVADOR: Apenas ${jogadorAlvoExclusivo} pode agir neste momento.`;
+        turnElem.style.color = "#ff9900";
     } else {
-        if (!jaAgioNesteTurno) {
-            turnElem.innerText = "👉 SUA VEZ! Escolha sua ação no grupo.";
-            turnElem.style.color = "#2d6a4f";
+        jogadorBloqueado = false;
+        if (modoJogo === 'solo') {
+            turnElem.innerText = "Modo Solo - Seu Turno Livre";
+            turnElem.style.color = "#ffd700";
         } else {
-            turnElem.innerText = "⏳ AÇÃO ENVIADA! Aguardando os outros jogadores...";
-            turnElem.style.color = "#e63946";
+            if (!jaAgioNesteTurno) {
+                turnElem.innerText = "👉 SUA VEZ! Escolha sua ação ou vote na opção da equipe.";
+                turnElem.style.color = "#2d6a4f";
+            } else {
+                turnElem.innerText = "⏳ AÇÃO ENVIADA! Aguardando o voto/ação dos outros jogadores...";
+                turnElem.style.color = "#e63946";
+            }
         }
     }
     atualizarEstadoCampos();
@@ -192,34 +220,65 @@ function atualizarEstadoCampos() {
     const sendBtn = document.getElementById('send-action-btn');
 
     if (inputElem && sendBtn) {
-        if (modoJogo === 'multiplayer' && jaAgioNesteTurno) {
+        if (jogadorBloqueado || (modoJogo === 'multiplayer' && jaAgioNesteTurno)) {
             inputElem.disabled = true;
             sendBtn.disabled = true;
-            inputElem.placeholder = "Aguardando o restante do grupo agir...";
+            inputElem.placeholder = jogadorBloqueado 
+                ? "Aguarde o jogador requisitado agir..." 
+                : "Ação enviada! Aguardando o grupo...";
         } else {
             inputElem.disabled = false;
             sendBtn.disabled = false;
-            inputElem.placeholder = "Digite sua ação aqui...";
+            inputElem.placeholder = "Digite sua ação ou escolha da rodada...";
         }
     }
 }
 
-// O Host verifica se todos enviaram a ação para chamar a IA
+// O Host apura os votos e executa a decisão com maior número de escolhas
 function verificarEProcessarTurnoColetivo() {
     if (modoJogo === 'solo') return;
 
-    // Espera ter 2 ações registradas (1 do Host + 1 do Jogador 2)
-    if (acoesDoTurno.length >= 2) {
-        const acaoConjunta = `[AÇÕES DO GRUPO NESTE TURNO]:\n` + acoesDoTurno.join("\n");
-        acoesDoTurno = []; // Limpa o buffer de ações da rodada
-        
-        // Notifica todos que uma nova rodada vai começar (libera os botões)
-        jaAgioNesteTurno = false;
-        atualizarIndicadorTurno();
-        enviarDadosRede('NOVA_RODADA', {});
+    // Se for ação individual restrita, espera apenas 1 ação
+    const totalEsperado = jogadorAlvoExclusivo ? 1 : 2;
 
-        // Envia o grupo de ações para a IA responder a todos juntos
-        enviarParaIA(acaoConjunta);
+    if (acoesDoTurno.length >= totalEsperado) {
+        let acaoFinalEnvio = "";
+
+        if (!jogadorAlvoExclusivo && Object.keys(votosDoTurno).length > 0) {
+            // Conta a escolha mais votada no grupo
+            const contagemVotos = {};
+            for (let player in votosDoTurno) {
+                const voto = votosDoTurno[player];
+                contagemVotos[voto] = (contagemVotos[voto] || 0) + 1;
+            }
+
+            let opcaoVencedora = "";
+            let maxVotos = 0;
+            for (let opcao in contagemVotos) {
+                if (contagemVotos[opcao] > maxVotos) {
+                    maxVotos = contagemVotos[opcao];
+                    opcaoVencedora = opcao;
+                }
+            }
+
+            acaoFinalEnvio = `[DECISÃO COLETIVA DO GRUPO (Mais Votada com ${maxVotos} votos)]:\n"${opcaoVencedora}"\n\nDetalhes das escolhas individuais:\n` + acoesDoTurno.join("\n");
+        } else {
+            acaoFinalEnvio = `[AÇÃO DA RODADA]:\n` + acoesDoTurno.join("\n");
+        }
+
+        // Reseta buffers
+        acoesDoTurno = [];
+        votosDoTurno = {};
+        jaAgioNesteTurno = false;
+        rolagemRealizadaNoTeste = false;
+        jogadorAlvoExclusivo = null;
+
+        // Atualiza a rodada em todos os dispositivos
+        atualizarIndicadorTurno();
+        enviarDadosRede('NOVA_RODADA', { alvoExclusivo: null });
+
+        // Envia o resultado compilado para a IA
+        enviarParaIA(acaoFinalEnvio);
     }
 }
 
@@ -275,35 +334,29 @@ function iniciarJornada() {
 // --- INTEGRAÇÃO COM A API DO GEMINI ---
 function configurarPromptSistema(fatorDestino) {
     const promptSistema = `
-Você é o Mestre de um jogo de RPG de mesa interpretativo, sombrio, cruel e sem piedade. 
-O jogo é disputado em GRUPO MULTIPLAYER. Os jogadores enviam suas ações juntas e você DEVE responder às ações de TODOS os membros do grupo ao mesmo tempo em um único texto contínuo.
+Você é o Mestre de um jogo de RPG de mesa interpretativo, sombrio e imersivo.
+O jogo é disputado em GRUPO MULTIPLAYER.
 
-Informações do jogador local (${personagem.nome} - ${personagem.classe}):
-- Força: ${personagem.atributos.forca}
-- Destreza: ${personagem.atributos.destreza}
-- Inteligência: ${personagem.atributos.inteligencia}
-- Constituição: ${personagem.atributos.constituicao}
-- Carisma: ${personagem.atributos.carisma}
+Informações do jogador (${personagem.nome} - ${personagem.classe}):
+- Força: ${personagem.atributos.forca} | Destreza: ${personagem.atributos.destreza} | Inteligência: ${personagem.atributos.inteligencia} | Constituição: ${personagem.atributos.constituicao} | Carisma: ${personagem.atributos.carisma}
 
-Fator do Destino inicial: "${fatorDestino}".
+Fator do Destino: "${fatorDestino}".
 
-REGRAS CRUCIAIS DE JOGO:
-1. Narre as consequências das ações de TODOS os jogadores combinadas na mesma resposta.
-2. Dê 2 a 3 opções nítidas de ação para o grupo decidir conjunto no próximo turno.
-3. Se qualquer jogador tentar uma ação arriscada, exija o teste adequado no formato:
-   "[TESTE: Role d6/d10/d20 + Atributo]"
-4. Avalie os resultados friamente. Seja cruel com falhas e recompense vitórias parciais ou totais.
+REGRAS CRUCIAIS DE NARRATIVA E GRUPO:
+1. Apresente sempre 2 a 3 opções numeradas para o grupo votar e seguir em conjunto.
+2. Em testes coletivos, APENAS 1 jogador precisa rolar os dados em nome do grupo (o primeiro a agir). Solicite o teste no formato: "[TESTE: Role d6/d10/d20 + Atributo]".
+3. Se um evento for estritamente direcionado para APENAS UM JOGADOR (ex: uma armadilha individual ou visão), especifique claramente no texto usando a marcação: "[ALVO: NomeDoJogador]".
 `;
 
     historicoChat = [
         { role: "user", parts: [{ text: promptSistema }] },
-        { role: "model", parts: [{ text: "Entendido. Narraria a jornada do grupo respondendo às ações coletivas de todos os jogadores a cada turno." }] }
+        { role: "model", parts: [{ text: "Entendido. Narraria a história respeitando as escolhas coletivas e ações individuais." }] }
     ];
 }
 
 async function enviarParaIA(mensagemJogador) {
     if (!GEMINI_API_KEY || GEMINI_API_KEY.trim() === "") {
-        adicionarMensagemMestre("⚠️ [ERRO: Aguarde o Host fornecer a chave da API ou configure a sua chave no painel inicial!]");
+        adicionarMensagemMestre("⚠️ [ERRO: Configure a chave de API no painel inicial!]");
         return;
     }
 
@@ -317,7 +370,7 @@ async function enviarParaIA(mensagemJogador) {
     const loadingId = "mestre-loading";
     
     if (!document.getElementById(loadingId)) {
-        storyLog.innerHTML += `<p id="${loadingId}"><em>O Mestre está avaliando as ações do grupo...</em></p>`;
+        storyLog.innerHTML += `<p id="${loadingId}"><em>O Mestre está interpretando a decisão...</em></p>`;
         storyLog.scrollTop = storyLog.scrollHeight;
     }
 
@@ -332,14 +385,7 @@ async function enviarParaIA(mensagemJogador) {
         const loadingElement = document.getElementById(loadingId);
         if (loadingElement) loadingElement.remove();
 
-        if (data.error) {
-            console.error("Erro da API:", data.error);
-            historicoChat.pop();
-            adicionarMensagemMestre(`⚠️ [Erro do Mestre: ${data.error.message}]`);
-            return;
-        }
-
-        if (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts[0].text) {
+        if (data.candidates && data.candidates[0]?.content?.parts[0]?.text) {
             const respostaMestre = data.candidates[0].content.parts[0].text;
             
             historicoChat.push({ role: "model", parts: [{ text: respostaMestre }] });
@@ -352,17 +398,14 @@ async function enviarParaIA(mensagemJogador) {
             
             analisarEAtivarPainelDeTeste(respostaMestre);
         } else {
-            console.error("Dados inesperados:", data);
             historicoChat.pop();
-            adicionarMensagemMestre("O Mestre se perdeu nas brumas do vazio... Tente novamente.");
+            adicionarMensagemMestre("O Mestre hesitou em sua decisão... Tente novamente.");
         }
     } catch (error) {
-        console.error("Erro na requisição:", error);
         const loadingElement = document.getElementById(loadingId);
         if (loadingElement) loadingElement.remove();
-        
         historicoChat.pop();
-        adicionarMensagemMestre("Ocorreu uma falha na conexão com os planos arcanos. Tente novamente.");
+        adicionarMensagemMestre("Ocorreu uma falha na conexão com os planos arcanos.");
     }
 }
 
@@ -390,7 +433,7 @@ function ganharXP(quantidade) {
         personagem.xpNecessario = Math.floor(personagem.xpNecessario * 1.5);
 
         const storyLog = document.getElementById('storyLog');
-        storyLog.innerHTML += `<p class="system-msg" style="color: #ffd700; font-weight: bold;">🎉 NÍVEL AUMENTADO! Você subiu para o Nível ${personagem.nivel} e ganhou 3 pontos para distribuir!</p>`;
+        storyLog.innerHTML += `<p class="system-msg" style="color: #ffd700; font-weight: bold;">🎉 NÍVEL AUMENTADO! Você subiu para o Nível ${personagem.nivel} e ganhou 3 pontos!</p>`;
     }
 
     atualizarFichaInterface();
@@ -401,16 +444,25 @@ function subirAtributo(attr) {
         personagem.atributos[attr]++;
         personagem.pontosLvlUp--;
         atualizarFichaInterface();
-        
-        const storyLog = document.getElementById('storyLog');
-        storyLog.innerHTML += `<p class="system-msg" style="color:#2d6a4f"><em>Você aumentou sua ${attr.toUpperCase()} para ${personagem.atributos[attr]}!</em></p>`;
     }
 }
 
-// --- MECÂNICA DE TESTES INTEGRADA AO CHAT ---
+// --- DETECÇÃO DE AÇÕES INDIVIDUAIS E TESTES ---
 function analisarEAtivarPainelDeTeste(texto) {
     const textoMinusculo = texto.toLowerCase();
     
+    // Verifica se a ação é restrita a um jogador específico [ALVO: Nome]
+    if (textoMinusculo.includes('[alvo:')) {
+        const match = texto.match(/\[ALVO:\s*([^\]]+)\]/i);
+        if (match && match[1]) {
+            jogadorAlvoExclusivo = match[1].trim();
+            if (eHost) {
+                enviarDadosRede('NOVA_RODADA', { alvoExclusivo: jogadorAlvoExclusivo });
+            }
+            atualizarIndicadorTurno();
+        }
+    }
+
     if (textoMinusculo.includes('[teste:') || textoMinusculo.includes('role um d') || textoMinusculo.includes('teste de')) {
         let dadoDetectado = 20;
         if (textoMinusculo.includes('d6')) dadoDetectado = 6;
@@ -429,6 +481,7 @@ function analisarEAtivarPainelDeTeste(texto) {
         testeAtivo.requerido = true;
         testeAtivo.atributo = attrDetectado;
         testeAtivo.ladosDado = dadoDetectado;
+        rolagemRealizadaNoTeste = false; // Habilita para o 1º a rolar
     }
 }
 
@@ -440,16 +493,23 @@ function confirmarEEnviarTeste() {
     testeAtivo.ladosDado = dadoSelecionado;
 
     document.getElementById('test-selector-container').classList.add('hidden');
-
-    const storyLog = document.getElementById('storyLog');
-    storyLog.innerHTML += `<p class="system-msg" style="color: #ffd700; font-style: italic;">👉 <strong>Você preparou seu teste:</strong> Rolagem de d${dadoSelecionado} somada com ${atributoSelecionado.toUpperCase()} (Bônus de +${personagem.atributos[atributoSelecionado]}). Jogue o dado correspondente!</p>`;
-    storyLog.scrollTop = storyLog.scrollHeight;
 }
 
-// --- ROLAGEM DE DADOS INDIVIDUAIS ---
+// --- ROLAGEM DE DADOS (1 APENAS ROLA POR TESTE COLETIVO) ---
 function animarERolarIndividual(lados) {
+    if (jogadorBloqueado) {
+        alert("Ação bloqueada! Aguarde o momento do jogador selecionado.");
+        return;
+    }
+
     if (modoJogo === 'multiplayer' && jaAgioNesteTurno) {
-        alert("Você já enviou sua ação nesta rodada! Aguarde os outros participantes.");
+        alert("Você já enviou sua ação nesta rodada!");
+        return;
+    }
+
+    // Impede rolagens duplicadas se outro jogador já rolou para a ação em conjunto
+    if (rolagemRealizadaNoTeste && testeAtivo.requerido) {
+        alert("Um membro do grupo já realizou a rolagem deste teste!");
         return;
     }
 
@@ -467,12 +527,14 @@ function animarERolarIndividual(lados) {
         diceElement.innerText = resultadoDado;
 
         if (testeAtivo.requerido && testeAtivo.ladosDado === lados) {
+            rolagemRealizadaNoTeste = true; // Trava para os outros jogadores
+            
             const bonusAtributo = personagem.atributos[testeAtivo.atributo];
             const totalGeral = resultadoDado + bonusAtributo;
 
             document.getElementById('current-roll').innerText = `Tirou ${resultadoDado} + ${bonusAtributo} (${testeAtivo.atributo.toUpperCase()}) = ${totalGeral}!`;
 
-            const textoTeste = `Realizou um teste de ${testeAtivo.atributo.toUpperCase()} (Dado d${lados}: ${resultadoDado} + Bônus: ${bonusAtributo} = Total: ${totalGeral})`;
+            const textoTeste = `[ROLAGEM DO GRUPO]: Teste de ${testeAtivo.atributo.toUpperCase()} (Dado d${lados}: ${resultadoDado} + Bônus: ${bonusAtributo} = Total: ${totalGeral})`;
             
             testeAtivo.requerido = false;
             ganharXP(25);
@@ -482,7 +544,7 @@ function animarERolarIndividual(lados) {
             atualizarIndicadorTurno();
 
             if (modoJogo === 'multiplayer') {
-                enviarDadosRede('REGISTRAR_ACAO_JOGADOR', { nome: personagem.nome, texto: textoTeste });
+                enviarDadosRede('TESTE_REALIZADO', { nome: personagem.nome, texto: textoTeste });
                 if (eHost) {
                     acoesDoTurno.push(`${personagem.nome}: ${textoTeste}`);
                     verificarEProcessarTurnoColetivo();
@@ -496,7 +558,7 @@ function animarERolarIndividual(lados) {
     }, 800);
 }
 
-// --- CONTROLES DE INTERFACE DO JOGO ---
+// --- CONTROLES DE INTERFACE E ENVIOS ---
 function openTab(tabId) {
     document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active-content'));
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -520,11 +582,7 @@ function atualizarFichaInterface() {
 
     const lvlUpBtns = document.querySelectorAll('.lvl-up-btn');
     lvlUpBtns.forEach(btn => {
-        if (personagem.pontosLvlUp > 0) {
-            btn.classList.remove('hidden');
-        } else {
-            btn.classList.add('hidden');
-        }
+        btn.classList.toggle('hidden', personagem.pontosLvlUp <= 0);
     });
 }
 
@@ -543,7 +601,9 @@ function novaJornada() {
 
         historicoChat = [];
         acoesDoTurno = [];
+        votosDoTurno = {};
         testeAtivo.requerido = false;
+        jogadorAlvoExclusivo = null;
         document.getElementById('test-selector-container').classList.add('hidden');
 
         document.getElementById('char-name').value = "";
@@ -558,8 +618,13 @@ function novaJornada() {
 }
 
 function enviarAcao() {
+    if (jogadorBloqueado) {
+        alert("Aguarde a sua vez! Apenas o jogador selecionado pelo Mestre pode interagir agora.");
+        return;
+    }
+
     if (modoJogo === 'multiplayer' && jaAgioNesteTurno) {
-        alert("Você já enviou sua ação para esta rodada! Aguarde os outros jogadores.");
+        alert("Você já enviou sua ação nesta rodada!");
         return;
     }
 
@@ -577,6 +642,7 @@ function enviarAcao() {
             
             if (eHost) {
                 acoesDoTurno.push(`${personagem.nome}: ${valor}`);
+                votosDoTurno[personagem.nome] = valor;
                 verificarEProcessarTurnoColetivo();
             }
         } else {
