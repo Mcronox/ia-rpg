@@ -25,7 +25,10 @@ let modoJogo = "solo";
 let peer = null;
 let conexao = null;
 let eHost = false;
-let meuTurno = true;
+let jaAgioNesteTurno = false; // Controla se o jogador atual já enviou a ação na rodada
+
+// Guarda as ações da rodada atual no Host antes de mandar para a IA
+let acoesDoTurno = []; 
 
 let personagem = {
     nome: "",
@@ -82,7 +85,7 @@ function criarSala() {
 
     peer.on('open', (id) => {
         eHost = true;
-        meuTurno = true;
+        jaAgioNesteTurno = false;
         document.getElementById('room-status').innerText = `Sala Criada! Código: ${id} (Aguardando Jogador 2...)`;
         atualizarIndicadorTurno();
     });
@@ -92,7 +95,6 @@ function criarSala() {
         configurarEventosConexao();
         document.getElementById('room-status').innerText = "Jogador 2 Conectado! Podem iniciar a jornada.";
         
-        // Envia a Chave API salva no Host para o Jogador 2
         if (GEMINI_API_KEY) {
             enviarDadosRede('SYNC_API_KEY', GEMINI_API_KEY);
         }
@@ -115,7 +117,7 @@ function entrarSala() {
     peer.on('open', () => {
         conexao = peer.connect(salaId);
         eHost = false;
-        meuTurno = false; // O convidado sempre aguarda a vez do Host
+        jaAgioNesteTurno = false;
         configurarEventosConexao();
         document.getElementById('room-status').innerText = "Conectado ao Host com sucesso!";
         atualizarIndicadorTurno();
@@ -141,40 +143,44 @@ function enviarDadosRede(tipo, payload) {
 function tratarDadosRecebidos(dados) {
     switch (dados.tipo) {
         case 'SYNC_API_KEY':
-            GEMINI_API_KEY = dados.payload; // Recebe a API Key do Host
+            GEMINI_API_KEY = dados.payload;
             break;
-        case 'MENSAGEM_JOGADOR':
+        case 'REGISTRAR_ACAO_JOGADOR':
             adicionarMensagemJogador(dados.payload.nome, dados.payload.texto);
-            meuTurno = true;
-            atualizarIndicadorTurno();
+            
+            if (eHost) {
+                // Host registra a ação do Jogador 2
+                acoesDoTurno.push(`${dados.payload.nome}: ${dados.payload.texto}`);
+                verificarEProcessarTurnoColetivo();
+            }
             break;
         case 'MENSAGEM_MESTRE':
             adicionarMensagemMestre(dados.payload);
             analisarEAtivarPainelDeTeste(dados.payload);
             break;
+        case 'NOVA_RODADA':
+            // Libera o turno para todos os jogadores responderem novamente
+            jaAgioNesteTurno = false;
+            atualizarIndicadorTurno();
+            break;
         case 'HISTORICO_IA':
             historicoChat = dados.payload;
-            break;
-        case 'PASSAR_TURNO':
-            meuTurno = true;
-            atualizarIndicadorTurno();
             break;
     }
 }
 
-// --- GERENCIAMENTO DE TURNOS E BLOQUEIO DE INTERFACE ---
+// --- GERENCIAMENTO DE TURNOS COLETIVOS ---
 function atualizarIndicadorTurno() {
     const turnElem = document.getElementById('turn-indicator');
     if (modoJogo === 'solo') {
         turnElem.innerText = "Modo Solo - Seu Turno Livre";
         turnElem.style.color = "#ffd700";
-        meuTurno = true;
     } else {
-        if (meuTurno) {
-            turnElem.innerText = "👉 SEU TURNO DE AGIR!";
+        if (!jaAgioNesteTurno) {
+            turnElem.innerText = "👉 SUA VEZ! Escolha sua ação no grupo.";
             turnElem.style.color = "#2d6a4f";
         } else {
-            turnElem.innerText = "⏳ TURNO DO COMPANHEIRO... (Aguarde)";
+            turnElem.innerText = "⏳ AÇÃO ENVIADA! Aguardando os outros jogadores...";
             turnElem.style.color = "#e63946";
         }
     }
@@ -186,15 +192,34 @@ function atualizarEstadoCampos() {
     const sendBtn = document.getElementById('send-action-btn');
 
     if (inputElem && sendBtn) {
-        if (modoJogo === 'multiplayer' && !meuTurno) {
+        if (modoJogo === 'multiplayer' && jaAgioNesteTurno) {
             inputElem.disabled = true;
             sendBtn.disabled = true;
-            inputElem.placeholder = "Aguarde o seu turno para escrever...";
+            inputElem.placeholder = "Aguardando o restante do grupo agir...";
         } else {
             inputElem.disabled = false;
             sendBtn.disabled = false;
             inputElem.placeholder = "Digite sua ação aqui...";
         }
+    }
+}
+
+// O Host verifica se todos enviaram a ação para chamar a IA
+function verificarEProcessarTurnoColetivo() {
+    if (modoJogo === 'solo') return;
+
+    // Espera ter 2 ações registradas (1 do Host + 1 do Jogador 2)
+    if (acoesDoTurno.length >= 2) {
+        const acaoConjunta = `[AÇÕES DO GRUPO NESTE TURNO]:\n` + acoesDoTurno.join("\n");
+        acoesDoTurno = []; // Limpa o buffer de ações da rodada
+        
+        // Notifica todos que uma nova rodada vai começar (libera os botões)
+        jaAgioNesteTurno = false;
+        atualizarIndicadorTurno();
+        enviarDadosRede('NOVA_RODADA', {});
+
+        // Envia o grupo de ações para a IA responder a todos juntos
+        enviarParaIA(acaoConjunta);
     }
 }
 
@@ -240,7 +265,7 @@ function iniciarJornada() {
     const mestreIntro = `
         <p><strong>Mestre:</strong> Bem-vindo, <strong>${personagem.nome}</strong>, o <strong>${personagem.classe}</strong>!</p>
         <p class="system-msg" style="color: #ffd700; font-style: italic;"><strong>Fator do Destino:</strong> ${destinoSorteado}</p>
-        <p>Sua jornada começa sob um céu carregado de mistérios. Como você dá o seu primeiro passo?</p>
+        <p>Sua jornada começa sob um céu carregado de mistérios. Como o grupo dá o seu primeiro passo?</p>
     `;
     document.getElementById('storyLog').innerHTML = mestreIntro;
 
@@ -251,7 +276,9 @@ function iniciarJornada() {
 function configurarPromptSistema(fatorDestino) {
     const promptSistema = `
 Você é o Mestre de um jogo de RPG de mesa interpretativo, sombrio, cruel e sem piedade. 
-O jogador principal se chama "${personagem.nome}", pertence à classe "${personagem.classe}" e possui estes atributos:
+O jogo é disputado em GRUPO MULTIPLAYER. Os jogadores enviam suas ações juntas e você DEVE responder às ações de TODOS os membros do grupo ao mesmo tempo em um único texto contínuo.
+
+Informações do jogador local (${personagem.nome} - ${personagem.classe}):
 - Força: ${personagem.atributos.forca}
 - Destreza: ${personagem.atributos.destreza}
 - Inteligência: ${personagem.atributos.inteligencia}
@@ -260,22 +287,17 @@ O jogador principal se chama "${personagem.nome}", pertence à classe "${persona
 
 Fator do Destino inicial: "${fatorDestino}".
 
-REGRAS CRUCIAIS DE JOGO E SOBREVIVÊNCIA:
-1. Narre o ambiente de forma medieval, detalhada e opressora. As ameaças são reais e podem matar o herói.
-2. Não jogue pelo jogador. Narre as consequências e dê 2 a 3 opções nítidas de ação.
-3. Se o jogador tentar qualquer ação que exija esforço físico, agilidade, perícia, conhecimento ou lábia, você DEVE exigir que ele faça um teste. 
-   - Ao propor o teste, você DEVE incluir de forma clara no texto a instrução exatamente neste formato:
-     "[TESTE: Role d6/d10/d20 + Atributo]" (Exemplo: "[TESTE: Role d20 + Inteligencia]")
-4. NÃO invente ou narre o resultado do teste antes do jogador rolar o dado. Aguarde ele rolar.
-5. Quando o jogador informar o resultado da soma (Dado + Atributo), avalie friamente:
-   - Resultados excelentes representam vitórias parciais ou totais.
-   - Resultados baixos representam ferimentos graves, perda de equipamentos ou morte eminente. Seja cruel, não poupe a vida do jogador se as rolagens forem ruins.
-6. Se a vida do personagem acabar de fato em decorrência das falhas, declare o fim da campanha (Fim de Jogo) tragicamente.
+REGRAS CRUCIAIS DE JOGO:
+1. Narre as consequências das ações de TODOS os jogadores combinadas na mesma resposta.
+2. Dê 2 a 3 opções nítidas de ação para o grupo decidir conjunto no próximo turno.
+3. Se qualquer jogador tentar uma ação arriscada, exija o teste adequado no formato:
+   "[TESTE: Role d6/d10/d20 + Atributo]"
+4. Avalie os resultados friamente. Seja cruel com falhas e recompense vitórias parciais ou totais.
 `;
 
     historicoChat = [
         { role: "user", parts: [{ text: promptSistema }] },
-        { role: "model", parts: [{ text: "Entendido. Serei um Mestre implacável e justo. Que os dados decidam se você sobreviverá." }] }
+        { role: "model", parts: [{ text: "Entendido. Narraria a jornada do grupo respondendo às ações coletivas de todos os jogadores a cada turno." }] }
     ];
 }
 
@@ -295,7 +317,7 @@ async function enviarParaIA(mensagemJogador) {
     const loadingId = "mestre-loading";
     
     if (!document.getElementById(loadingId)) {
-        storyLog.innerHTML += `<p id="${loadingId}"><em>O Mestre está pensando...</em></p>`;
+        storyLog.innerHTML += `<p id="${loadingId}"><em>O Mestre está avaliando as ações do grupo...</em></p>`;
         storyLog.scrollTop = storyLog.scrollHeight;
     }
 
@@ -426,8 +448,8 @@ function confirmarEEnviarTeste() {
 
 // --- ROLAGEM DE DADOS INDIVIDUAIS ---
 function animarERolarIndividual(lados) {
-    if (modoJogo === 'multiplayer' && !meuTurno) {
-        alert("Aguarde o seu turno para rolar dados!");
+    if (modoJogo === 'multiplayer' && jaAgioNesteTurno) {
+        alert("Você já enviou sua ação nesta rodada! Aguarde os outros participantes.");
         return;
     }
 
@@ -450,29 +472,28 @@ function animarERolarIndividual(lados) {
 
             document.getElementById('current-roll').innerText = `Tirou ${resultadoDado} + ${bonusAtributo} (${testeAtivo.atributo.toUpperCase()}) = ${totalGeral}!`;
 
-            const mensagemTeste = `[SISTEMA: O jogador ${personagem.nome} executou o teste exigido. Rolagem do d${lados}: ${resultadoDado}. Bônus de ${testeAtivo.atributo.toUpperCase()}: +${bonusAtributo}. SOMA TOTAL = ${totalGeral}. Narre as consequências!]`;
+            const textoTeste = `Realizou um teste de ${testeAtivo.atributo.toUpperCase()} (Dado d${lados}: ${resultadoDado} + Bônus: ${bonusAtributo} = Total: ${totalGeral})`;
             
             testeAtivo.requerido = false;
             ganharXP(25);
 
-            if (modoJogo === 'multiplayer') {
-                enviarDadosRede('MENSAGEM_JOGADOR', { nome: personagem.nome, texto: `Realizou um teste (Total: ${totalGeral})` });
-                enviarDadosRede('PASSAR_TURNO', {});
-                meuTurno = false;
-                atualizarIndicadorTurno();
-            }
+            adicionarMensagemJogador(personagem.nome, textoTeste);
+            jaAgioNesteTurno = true;
+            atualizarIndicadorTurno();
 
-            enviarParaIA(mensagemTeste);
+            if (modoJogo === 'multiplayer') {
+                enviarDadosRede('REGISTRAR_ACAO_JOGADOR', { nome: personagem.nome, texto: textoTeste });
+                if (eHost) {
+                    acoesDoTurno.push(`${personagem.nome}: ${textoTeste}`);
+                    verificarEProcessarTurnoColetivo();
+                }
+            } else {
+                enviarParaIA(`${personagem.nome}: ${textoTeste}`);
+            }
         } else {
             document.getElementById('current-roll').innerText = `Tirou ${resultadoDado} no d${lados}!`;
-            enviarResultadoDadoParaMestre(resultadoDado, lados);
         }
     }, 800);
-}
-
-function enviarResultadoDadoParaMestre(resultado, lados) {
-    const msg = `[SISTEMA: O jogador ${personagem.nome} realizou uma rolagem casual de d${lados} na mesa e obteve ${resultado}]`;
-    enviarParaIA(msg);
 }
 
 // --- CONTROLES DE INTERFACE DO JOGO ---
@@ -521,6 +542,7 @@ function novaJornada() {
         };
 
         historicoChat = [];
+        acoesDoTurno = [];
         testeAtivo.requerido = false;
         document.getElementById('test-selector-container').classList.add('hidden');
 
@@ -536,8 +558,8 @@ function novaJornada() {
 }
 
 function enviarAcao() {
-    if (modoJogo === 'multiplayer' && !meuTurno) {
-        alert("Aguarde o seu turno para realizar uma ação!");
+    if (modoJogo === 'multiplayer' && jaAgioNesteTurno) {
+        alert("Você já enviou sua ação para esta rodada! Aguarde os outros jogadores.");
         return;
     }
 
@@ -547,15 +569,21 @@ function enviarAcao() {
     if (valor !== "") {
         adicionarMensagemJogador(personagem.nome, valor);
 
+        jaAgioNesteTurno = true;
+        atualizarIndicadorTurno();
+
         if (modoJogo === 'multiplayer') {
-            enviarDadosRede('MENSAGEM_JOGADOR', { nome: personagem.nome, texto: valor });
-            enviarDadosRede('PASSAR_TURNO', {});
-            meuTurno = false;
-            atualizarIndicadorTurno();
+            enviarDadosRede('REGISTRAR_ACAO_JOGADOR', { nome: personagem.nome, texto: valor });
+            
+            if (eHost) {
+                acoesDoTurno.push(`${personagem.nome}: ${valor}`);
+                verificarEProcessarTurnoColetivo();
+            }
+        } else {
+            ganharXP(10);
+            enviarParaIA(`${personagem.nome}: ${valor}`);
         }
 
         input.value = "";
-        ganharXP(10);
-        enviarParaIA(`${personagem.nome}: ${valor}`);
     }
 }
