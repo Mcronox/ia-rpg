@@ -1,0 +1,16 @@
+{
+  "name": "Master RPG",
+  "short_name": "Master RPG",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#15110e",
+  "theme_color": "#15110e",
+  "icons": [
+    {
+      "src": "capa.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
